@@ -1,0 +1,209 @@
+{
+  "definitionVersion" : "1.0.0",
+  "name" : "Safe Browsing UserAction",
+  "panX" : 20.0,
+  "panY" : 20.0,
+  "logLevel" : "INFO",
+  "description" : "Query Google Safe Browsing API for a domain via UserAction",
+  "jobList" : [ {
+    "id" : 65,
+    "appCatalogItem" : {
+      "programName" : "TCPB - JMESPath v1.0",
+      "displayName" : "JMES Path",
+      "programVersion" : "1.0.0"
+    },
+    "name" : "Transform Data",
+    "jobParameterList" : [ {
+      "appCatalogItemParameter" : {
+        "paramName" : "jmes_mapping"
+      },
+      "value" : "[{\"key\":\"threatTypes\",\"value\":\"matches[*].threatType | [].[\\u0027SAFE-BROWSING\\u0027,@]| map(\\u0026join(\\u0027_\\u0027,@),@)\"}]"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "json"
+      },
+      "value" : "#App:69:http_client.response.output_content!String"
+    } ],
+    "locationLeft" : 610.0,
+    "locationTop" : 60.0,
+    "outputVariables" : "[{\"name\":\"threatTypes\",\"type\":\"String\"}]",
+    "playbookRetryEnabled" : false
+  }, {
+    "id" : 69,
+    "appCatalogItem" : {
+      "programName" : "Http Client",
+      "displayName" : "HTTP Client",
+      "programVersion" : "1.0.0"
+    },
+    "name" : "POST to Google",
+    "jobParameterList" : [ {
+      "appCatalogItemParameter" : {
+        "paramName" : "httpclient_proxy"
+      },
+      "value" : "false"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "headers"
+      },
+      "value" : "[]"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "url"
+      },
+      "value" : "https://safebrowsing.googleapis.com/v4/threatMatches:find"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "body"
+      },
+      "value" : "{\n    \"client\": {\n        \"clientId\": \"tc-safebrowsing-playbook\",\n        \"clientVersion\": \"0.0.1\"\n    },\n    \"threatInfo\": {\n        \"threatTypes\": [\"THREAT_TYPE_UNSPECIFIED\", \"MALWARE\", \"SOCIAL_ENGINEERING\", \"UNWANTED_SOFTWARE\", \"POTENTIALLY_HARMFUL_APPLICATION\"],\n        \"platformTypes\": [\"ANY_PLATFORM\"],\n        \"threatEntryTypes\": [\"THREAT_ENTRY_TYPE_UNSPECIFIED\", \"URL\", \"EXECUTABLE\"],\n        \"threatEntries\": [{\n            \"url\": \"#Trigger:13:trg.action.item!String \"\n        }]\n    }\n}"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "ignore_ssl_trust"
+      },
+      "value" : "false"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "parameters"
+      },
+      "value" : "[{\"key\":\"key\",\"value\":\"${ORGANIZATION:KEYCHAIN:SafeBrowsing}\"}]"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "action"
+      },
+      "value" : "POST"
+    } ],
+    "locationLeft" : 360.0,
+    "locationTop" : 60.0,
+    "outputVariables" : "[{\"name\":\"http_client.response_code\",\"type\":\"String\"},{\"name\":\"http_client.response.output_content\",\"type\":\"String\"}]",
+    "playbookRetryEnabled" : false
+  }, {
+    "id" : 78,
+    "appCatalogItem" : {
+      "programName" : "TCPB - JsonPath v1.0",
+      "displayName" : "Json Path",
+      "programVersion" : "2.0.0"
+    },
+    "name" : "Convert Data to Array",
+    "jobParameterList" : [ {
+      "appCatalogItemParameter" : {
+        "paramName" : "json_content"
+      },
+      "value" : "#App:65:threatTypes!String"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "column_mapping"
+      },
+      "value" : "[{\"key\":\"finalArray\",\"value\":\"*\"}]"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "null_missing_leaf"
+      },
+      "value" : "false"
+    } ],
+    "locationLeft" : 860.0,
+    "locationTop" : 60.0,
+    "outputVariables" : "[{\"name\":\"finalArray\",\"type\":\"StringArray\"}]",
+    "playbookRetryEnabled" : false
+  }, {
+    "id" : 79,
+    "appCatalogItem" : {
+      "programName" : "TCPB - TagCreate v1.0",
+      "displayName" : "Create ThreatConnect Tag",
+      "programVersion" : "1.0.3"
+    },
+    "name" : "Tag URL",
+    "jobParameterList" : [ {
+      "appCatalogItemParameter" : {
+        "paramName" : "fail_on_error"
+      },
+      "value" : "false"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "entity"
+      },
+      "value" : "#Trigger:13:trg.action.entity!TCEntity"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "tag"
+      },
+      "value" : "#App:78:finalArray!StringArray"
+    } ],
+    "locationLeft" : 1150.0,
+    "locationTop" : 280.0,
+    "outputVariables" : "[{\"name\":\"tc.tag.success_count\",\"type\":\"String\"}]",
+    "playbookRetryEnabled" : false
+  }, {
+    "id" : 87,
+    "appCatalogItem" : {
+      "programName" : "Logger",
+      "displayName" : "Logger",
+      "programVersion" : "1.0.0"
+    },
+    "name" : "No Results/Network Error",
+    "jobParameterList" : [ {
+      "appCatalogItemParameter" : {
+        "paramName" : "logging"
+      },
+      "value" : "ERROR"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "log_message"
+      },
+      "value" : "Something went wrong\n\n#App:69:http_client.response.output_content!String \n\n#App:69:http_client.response_code!String"
+    } ],
+    "locationLeft" : 360.0,
+    "locationTop" : 220.0,
+    "playbookRetryEnabled" : false
+  } ],
+  "playbookConnectionList" : [ {
+    "type" : "Pass",
+    "isCircularOnTarget" : false,
+    "targetJobId" : 69,
+    "sourceTriggerId" : 13
+  }, {
+    "type" : "Pass",
+    "isCircularOnTarget" : false,
+    "sourceJobId" : 69,
+    "targetJobId" : 65
+  }, {
+    "type" : "Pass",
+    "isCircularOnTarget" : false,
+    "sourceJobId" : 78,
+    "targetJobId" : 79
+  }, {
+    "type" : "Pass",
+    "isCircularOnTarget" : false,
+    "sourceJobId" : 65,
+    "targetJobId" : 78
+  }, {
+    "type" : "Pass",
+    "isCircularOnTarget" : true,
+    "sourceJobId" : 79,
+    "targetTriggerId" : 13
+  }, {
+    "type" : "Fail",
+    "isCircularOnTarget" : false,
+    "sourceJobId" : 69,
+    "targetJobId" : 87
+  } ],
+  "playbookTriggerList" : [ {
+    "id" : 13,
+    "name" : "Query Google SafeBrowsing",
+    "type" : "UserAction",
+    "eventType" : "External",
+    "locationLeft" : 120.0,
+    "locationTop" : 60.0,
+    "httpBasicAuthEnable" : false,
+    "httpBasicAuthUsername" : "J1TE8SZWWVVNJ6UES0RT",
+    "httpBasicAuthPassword" : "4Y65ECOAZWMMKJH1BUTX",
+    "httpResponseHeader" : "[]",
+    "httpResponseBody" : "Added #App:79:tc.tag.success_count!String tags",
+    "anyOrg" : true,
+    "orFilters" : false,
+    "fireOnDuplicate" : false,
+    "userActionTypes" : "URL",
+    "renderBodyAsTip" : true,
+    "outputVariables" : "[{\"name\":\"trg.action.item\",\"type\":\"String\"},{\"name\":\"trg.action.entity\",\"type\":\"TCEntity\"}]"
+  } ],
+  "dateExported" : "1/17/18 4:40 PM"
+}

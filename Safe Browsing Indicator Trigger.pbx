@@ -1,0 +1,198 @@
+{
+  "definitionVersion" : "1.0.0",
+  "name" : "Safe Browsing Indicator Trigger",
+  "panX" : 20.0,
+  "panY" : 20.0,
+  "logLevel" : "INFO",
+  "description" : "Query Google Safe Browsing API for a domain via UserAction",
+  "jobList" : [ {
+    "id" : 82,
+    "appCatalogItem" : {
+      "programName" : "TCPB - JMESPath v1.0",
+      "displayName" : "JMES Path",
+      "programVersion" : "1.0.0"
+    },
+    "name" : "Transform Data",
+    "jobParameterList" : [ {
+      "appCatalogItemParameter" : {
+        "paramName" : "jmes_mapping"
+      },
+      "value" : "[{\"key\":\"threatTypes\",\"value\":\"matches[*].threatType | [].[\\u0027SAFE-BROWSING\\u0027,@]| map(\\u0026join(\\u0027_\\u0027,@),@)\"}]"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "json"
+      },
+      "value" : "#App:83:http_client.response.output_content!String"
+    } ],
+    "locationLeft" : 610.0,
+    "locationTop" : 60.0,
+    "outputVariables" : "[{\"name\":\"threatTypes\",\"type\":\"String\"}]",
+    "playbookRetryEnabled" : false
+  }, {
+    "id" : 83,
+    "appCatalogItem" : {
+      "programName" : "Http Client",
+      "displayName" : "HTTP Client",
+      "programVersion" : "1.0.0"
+    },
+    "name" : "POST to Google",
+    "jobParameterList" : [ {
+      "appCatalogItemParameter" : {
+        "paramName" : "parameters"
+      },
+      "value" : "[{\"key\":\"key\",\"value\":\"${ORGANIZATION:KEYCHAIN:SafeBrowsing}\"}]"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "action"
+      },
+      "value" : "POST"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "httpclient_proxy"
+      },
+      "value" : "false"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "ignore_ssl_trust"
+      },
+      "value" : "false"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "body"
+      },
+      "value" : "{\n    \"client\": {\n        \"clientId\": \"tc-safebrowsing-playbook\",\n        \"clientVersion\": \"0.0.1\"\n    },\n    \"threatInfo\": {\n        \"threatTypes\": [\"THREAT_TYPE_UNSPECIFIED\", \"MALWARE\", \"SOCIAL_ENGINEERING\", \"UNWANTED_SOFTWARE\", \"POTENTIALLY_HARMFUL_APPLICATION\"],\n        \"platformTypes\": [\"ANY_PLATFORM\"],\n        \"threatEntryTypes\": [\"THREAT_ENTRY_TYPE_UNSPECIFIED\", \"URL\", \"EXECUTABLE\"],\n        \"threatEntries\": [{\n            \"url\": \"#Trigger:15:trg.tc.url!String \"\n        }]\n    }\n}"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "headers"
+      },
+      "value" : "[]"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "url"
+      },
+      "value" : "https://safebrowsing.googleapis.com/v4/threatMatches:find"
+    } ],
+    "locationLeft" : 360.0,
+    "locationTop" : 60.0,
+    "outputVariables" : "[{\"name\":\"http_client.response.output_content\",\"type\":\"String\"},{\"name\":\"http_client.response_code\",\"type\":\"String\"}]",
+    "playbookRetryEnabled" : false
+  }, {
+    "id" : 84,
+    "appCatalogItem" : {
+      "programName" : "TCPB - JsonPath v1.0",
+      "displayName" : "Json Path",
+      "programVersion" : "2.0.0"
+    },
+    "name" : "Convert Data to Array",
+    "jobParameterList" : [ {
+      "appCatalogItemParameter" : {
+        "paramName" : "null_missing_leaf"
+      },
+      "value" : "false"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "column_mapping"
+      },
+      "value" : "[{\"key\":\"finalArray\",\"value\":\"*\"}]"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "json_content"
+      },
+      "value" : "#App:82:threatTypes!String"
+    } ],
+    "locationLeft" : 860.0,
+    "locationTop" : 60.0,
+    "outputVariables" : "[{\"name\":\"finalArray\",\"type\":\"StringArray\"}]",
+    "playbookRetryEnabled" : false
+  }, {
+    "id" : 85,
+    "appCatalogItem" : {
+      "programName" : "TCPB - TagCreate v1.0",
+      "displayName" : "Create ThreatConnect Tag",
+      "programVersion" : "1.0.3"
+    },
+    "name" : "Tag URL",
+    "jobParameterList" : [ {
+      "appCatalogItemParameter" : {
+        "paramName" : "entity"
+      },
+      "value" : "#Trigger:15:trg.tc.entity!TCEntity"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "tag"
+      },
+      "value" : "#App:84:finalArray!StringArray"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "fail_on_error"
+      },
+      "value" : "false"
+    } ],
+    "locationLeft" : 1140.0,
+    "locationTop" : 60.0,
+    "playbookRetryEnabled" : false
+  }, {
+    "id" : 86,
+    "appCatalogItem" : {
+      "programName" : "Logger",
+      "displayName" : "Logger",
+      "programVersion" : "1.0.0"
+    },
+    "name" : "No Results/Network Error",
+    "jobParameterList" : [ {
+      "appCatalogItemParameter" : {
+        "paramName" : "logging"
+      },
+      "value" : "ERROR"
+    }, {
+      "appCatalogItemParameter" : {
+        "paramName" : "log_message"
+      },
+      "value" : "Something went wrong\n\n#App:83:http_client.response.output_content!String \n#App:83:http_client.response_code!String"
+    } ],
+    "locationLeft" : 360.0,
+    "locationTop" : 190.0,
+    "playbookRetryEnabled" : false
+  } ],
+  "playbookConnectionList" : [ {
+    "type" : "Pass",
+    "isCircularOnTarget" : false,
+    "sourceJobId" : 83,
+    "targetJobId" : 82
+  }, {
+    "type" : "Pass",
+    "isCircularOnTarget" : false,
+    "sourceJobId" : 84,
+    "targetJobId" : 85
+  }, {
+    "type" : "Pass",
+    "isCircularOnTarget" : false,
+    "sourceJobId" : 82,
+    "targetJobId" : 84
+  }, {
+    "type" : "Pass",
+    "isCircularOnTarget" : false,
+    "targetJobId" : 83,
+    "sourceTriggerId" : 15
+  }, {
+    "type" : "Fail",
+    "isCircularOnTarget" : false,
+    "sourceJobId" : 83,
+    "targetJobId" : 86
+  } ],
+  "playbookTriggerList" : [ {
+    "id" : 15,
+    "name" : "On URL Create",
+    "type" : "URL",
+    "eventType" : "Create",
+    "locationLeft" : 100.0,
+    "locationTop" : 60.0,
+    "httpBasicAuthEnable" : false,
+    "anyOrg" : false,
+    "orFilters" : false,
+    "fireOnDuplicate" : false,
+    "renderBodyAsTip" : false,
+    "outputVariables" : "[{\"name\":\"trg.tc.url\",\"type\":\"String\"},{\"name\":\"trg.tc.entity\",\"type\":\"TCEntity\"}]"
+  } ],
+  "dateExported" : "1/17/18 4:41 PM"
+}
